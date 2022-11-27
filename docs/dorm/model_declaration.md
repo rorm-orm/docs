@@ -2,12 +2,13 @@
 
 ## Model declaration
 
-Models are defined declarative as classes.
+Models are defined declaratively as classes.
 
 ```d
 import dorm.design;
 
-mixin RegisterModels; // registers all Model derived classes in this module and publicly imported modules
+// registers all Model derived classes in this module and publicly imported modules
+mixin RegisterModels;
 
 class User : Model
 {
@@ -41,9 +42,9 @@ CREATE TABLE user (
 
 ### Additional information
 
-- the tablename is derived from --- TODO
-- column `id` is added by default by inheriting `Model`, 
-adding another primary is possible with the `@primaryKey` annotation.
+- the table name and column names are by default derived from the source code names (identifiers). They are converted into `snake_case` for all DB operations.
+    - column names can be overriden using the `@columnName("...")` attribute.
+- to be a valid model, you need to define some `@primaryKey` or `@Id` field.
 
 ## Annotations
 
