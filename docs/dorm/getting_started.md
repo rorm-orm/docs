@@ -154,7 +154,7 @@ For more information see [rorm-cli migrate](../migrations/migrate.md)
 
 The entry-point to all DB-related DORM APIs is the DormDB struct. To use it, you need to first setup the DORM runtime using `mixin SetupDormRuntime;` somewhere in global scope. Then you can create a `DormDB` instance simply by calling its constructor with connection options as parameter:
 
-```d hl_lines=7 16
+```d hl_lines="7 16"
 // app.d
 import dorm.api.db;
 
