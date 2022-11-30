@@ -2,6 +2,9 @@
 site_name: rorm documentation 
 theme:
   name: material
+  features:
+    - content.tabs.link
+    - content.code.annotate
   palette:
   # Palette toggle for light mode
   - media: "(prefers-color-scheme: light)"
@@ -26,6 +29,8 @@ markdown_extensions:
   - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true 
   - pymdownx.emoji:
       emoji_index: !!python/name:materialx.emoji.twemoji
       emoji_generator: !!python/name:materialx.emoji.to_svg

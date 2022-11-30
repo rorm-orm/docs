@@ -21,6 +21,16 @@ The `dorm` dependency automatically downloads the [`rorm-lib`](https://github.co
 !!!info
 	The automatic `rorm-lib` download also downloads the `rorm-cli` CLI tool. Both these binaries are stored inside the dependency package directory (e.g. `~/.dub/packages/dorm-v0.1.0/dorm/`) `rorm-cli` is simply wrapped by `dub run dorm`, so it may also be installed globally and used as standalone application. (Using it directly has much faster startup time than using `dub run dorm` and will not trigger dub to do any internet lookup to see if the package is up-to-date)
 
+	You can change which tool to show in this documentation in these tabs:
+
+	=== "dub"
+
+		`dub run dorm -- args...` will be used in the instructions, which comes with the disadvantage of being slower to run, but does not put anything in PATH.
+
+	=== "rorm-cli"
+
+		`rorm-cli args...` will be used in the instructions, which comes with the advantage of being a regular executable that can be updated separately.
+
 ### Starting a new Project
 
 If you want to start a new project, dorm comes with project templates you can use:
@@ -45,15 +55,9 @@ A model is the code representation for data stored in an SQL database. In DORM t
 */
 module models;
 
-// imports common things needed in this modelling module. Should not be used
-// outside of `module models;` because it adds quite a lot of stuff to the
-// global namespace, which might not be useful elsewhere.
-import dorm.design;
+import dorm.design; // (1)
 
-// Makes it so the models defined in this module can be exported to the
-// internal JSON representation that is used by `rorm-cli` / `dub run dorm` to
-// automatically create migration files that can be used to initialize the DB.
-mixin RegisterModels;
+mixin RegisterModels; // (2)
 
 // example model
 class User : Model
@@ -79,6 +83,21 @@ class Car : Model
 }
 ```
 
+1.	imports common things needed in this modeling module. Should not be used
+	outside of `module models;` because it adds quite a lot of stuff to the
+	global namespace, which might not be useful elsewhere.
+
+2.	`mixin RegisterModels` makes it so the models defined in this module can be
+	exported to the internal JSON representation (`.models.json`) that is used
+	by `rorm-cli` / `dub run dorm` to automatically create migration files that
+	can be used to initialize the DB.
+
+	Note that this only does something if the `dorm:build-models` dependency is
+	added to the active compilation.
+
+	For more infos see [Exporting Models](#exporting-models)
+
+
 This will then later automatically be used by the auto-migrator to create actual SQL tables and handle application upgrades for users automatically. Some types, for example strings, have mandatory annotations like `@maxLength`. See [Model Declaration](model_declaration.md) for further details.
 
 All Models in DORM should be put into a single file, commonly called `models.d`. This file should be put directly inside inside the source root folder of the project for applications. Libraries defining models for applications should make their models `abstract` classes when intended to make them extensible or define `mixin templates` to use them as-is when requested by the application developer.
@@ -98,11 +117,17 @@ Internally this works adding a `postBuildCommand` when building as an executable
 
 Migrations can be created by running this CLI command:
 
-```sh
-dub run dorm -- make-migrations
-# or with rorm-cli installed as standalone:
-rorm-cli make-migrations
-```
+=== "dub"
+
+	```sh
+	dub run dorm -- make-migrations
+	```
+
+=== "rorm-cli"
+
+	```sh
+	rorm-cli make-migrations
+	```
 
 This command will read the automatically generated models definition file `.models.json` to compute the required database migrations as TOML files in the directory `migrations/`.
 
@@ -119,32 +144,73 @@ DORM and the CLI tool (`rorm-cli` or `dub run dorm`) need to know how to connect
 
 The database connection configuration consists of a `[Database]` section which contains a `Driver` key and some driver-specific options. A simple example using an SQLite database looks like this:
 
-```toml
-# database.toml
-[Database]
-# Valid driver types are: "MySQL", "Postgres" and "SQLite"
-Driver = "SQLite"
+=== "SQLite"
 
-# Filename of the database
-Filename = "sqlite.db"
-```
+	```toml title="database.toml"
+	[Database]
+	# Valid driver types are: "MySQL", "Postgres" and "SQLite"
+	Driver = "SQLite"
+
+	# Filename of the database
+	Filename = "sqlite.db"
+	```
+
+=== "MySQL"
+
+	```toml title="database.toml"
+	[Database]
+	# Valid driver types are: "MySQL", "Postgres" and "SQLite"
+	Driver = "MySQL"
+	Name = "dbname"
+	Host = "127.0.0.1"
+	Port = 3306
+	User = "dbuser"
+	Password = "super-secure-password"
+	```
+
+=== "PostgreSQL"
+
+	```toml title="database.toml"
+	[Database]
+	# Valid driver types are: "MySQL", "Postgres" and "SQLite"
+	Driver = "Postgres"
+	Name = "dbname"
+	Host = "127.0.0.1"
+	Port = 5432
+	User = "dbuser"
+	Password = "super-secure-password"
+	```
 
 !!!tip
 	If you don't have any `database.toml` file yet, you can create a template one using
 
-	```sh
-	dub run dorm -- migrate
-	# or with rorm-cli installed:
-	rorm-cli migrate
-	```
+	=== "dub"
+
+		```sh
+		dub run dorm -- migrate
+		```
+
+	=== "rorm-cli"
+
+		```sh
+		rorm-cli migrate
+		```
 
 ### Creating Tables / Running Migrations
 
 When both a `migrations` folder and the `database.toml` exist, as described in the previous two sections, running
 
-```sh
-rorm-cli migrate
-```
+=== "dub"
+
+	```sh
+	dub run dorm -- migrate
+	```
+
+=== "rorm-cli"
+
+	```sh
+	rorm-cli migrate
+	```
 
 will create missing tables, alter fields, etc.
 
@@ -154,7 +220,7 @@ For more information see [rorm-cli migrate](../migrations/migrate.md)
 
 The entry-point to all DB-related DORM APIs is the DormDB struct. To use it, you need to first setup the DORM runtime using `mixin SetupDormRuntime;` somewhere in global scope. Then you can create a `DormDB` instance simply by calling its constructor with connection options as parameter:
 
-```d hl_lines="7 16"
+```d hl_lines="7 12"
 // app.d
 import dorm.api.db;
 
@@ -165,16 +231,26 @@ mixin SetupDormRuntime;
 
 void main()
 {
-	// TODO: parse this from database.toml
-	DBConnectOptions options = {
-		backend: DBBackend.SQLite,
-		name: "database.sqlite3"
-	};
-	auto db = DormDB(options);
+	auto appConfig = parseTomlConfig!BareConfiguration("database.toml");
+	auto db = DormDB(appConfig.database);
 }
 ```
 
 The `db` variable here can be used to do all kinds of DB-related operations. Most APIs use the [Builder pattern](https://en.wikipedia.org/wiki/Builder_pattern).
+
+The `parseTomlConfig!BareConfiguration("database.toml")` call reads the database.toml file in the current directory and parses it as TOML file. DORM defines `BareConfiguration` like so:
+
+```d
+struct BareConfiguration
+{
+	// make sure you put custom fields before database!
+
+	/// DORM database settings
+	@serdeKeys("Database") DBConnectOptions database;
+}
+```
+
+by copy-pasting this definition you can simply define your own configuration struct and add custom server configuration things inside there for a unified config file for all the app settings. Then in the `parseTomlConfig` call the custom struct is passed in as template parameter instead of `BareConfiguration`. It's also possible to use a different configuration entirely, however `rorm-cli` / `dub run dorm` will be unable to use the correct database connection parameters in that case.
 
 The following examples assume the Models definition example from [Defining Models](#defining-models) is used.
 
@@ -188,70 +264,139 @@ The data can be retrieved using:
 - `findOne` to fetch one row or error if there is none,
 - `findOptional` to fetch one row or return null if there is none.
 
-```d
-// SELECT id, username, age FROM user
-User[] allUsers = db.select!User.all;
+=== "app.d"
 
-// SELECT id, username, age FROM user LIMIT 1
-User firstUser = db.select!User.findOne;
+	```d
+	// SELECT id, username, age FROM user
+	User[] allUsers = db.select!User.all;
 
-// SELECT id, username, age FROM user WHERE age = 0
-auto usersWithZeroAge = db.select!User
-	.condition(u => u.age.equals(0))
-	.stream;
-```
+	// SELECT id, username, age FROM user LIMIT 1
+	User firstUser = db.select!User.findOne;
+
+	// SELECT id, username, age FROM user WHERE age = 0
+	auto usersWithZeroAge = db.select!User
+		.condition(u => u.age.equals(0))
+		.stream;
+	```
+
+=== "models.d"
+
+	```d
+	class User : Model
+	{
+		@Id long id;
+
+		@maxLength(255)
+		string username;
+
+		short age;
+	}
+	```
 
 ### Insert
 
 Use the `insert` method on the `DormDB` object to perform an `INSERT` operation. You can pass a regular Model, a list of Models, a [Patch](#patches) or a list of Patches into this.
 
-```d
-Car car = new Car();
-car.brand = "Toyota";
-car.color = "pearl white";
-car.serialNo = 0;
-// INSERT OR ABORT INTO car (brand, color, serial_no) VALUES ('Toyota', 'pearl white', 0);
-db.insert(car);
-```
+=== "app.d"
+
+	```d
+	Car car = new Car();
+	car.brand = "Toyota";
+	car.color = "pearl white";
+	car.serialNo = 0;
+	// INSERT OR ABORT INTO car (brand, color, serial_no)
+	//   VALUES ('Toyota', 'pearl white', 0);
+	db.insert(car);
+	```
+
+=== "models.d"
+
+	```d
+	class Car : Model
+	{
+		@maxLength(255)
+		string brand;
+
+		@maxLength(255)
+		string color;
+
+		@primaryKey
+		long serialNo;
+	}
+	```
 
 ### Update
 
 Use the `update` method on the `DormDB` object to start an `UPDATE` operation. You pass a Model class into the template parameter. This returns a builder struct on which you can call the methods `condition` and `set!"fieldName"(value)` or `set(Patch)` to manipulate what will be done. When ready to send the update, call `.await` to perform the update.
 
-```d
-// UPDATE OR ABORT user SET username = 'newUsername'
-db.update!User
-	.set!"username"("newUsername")
-	.await;
+=== "app.d"
 
-// UPDATE OR ABORT user SET username = 'boss', age = 42 WHERE id = 1
-db.update!User
-	.set!"username"("boss")
-	.set!"age"(42)
-	.condition(u => u.id.equals(1))
-	.await;
-```
+	```d
+	// UPDATE OR ABORT user SET username = 'newUsername'
+	db.update!User
+		.set!"username"("newUsername")
+		.await;
+
+	// UPDATE OR ABORT user SET username = 'boss', age = 42 WHERE id = 1
+	db.update!User
+		.set!"username"("boss")
+		.set!"age"(42)
+		.condition(u => u.id.equals(1))
+		.await;
+	```
+
+=== "models.d"
+
+	```d
+	class User : Model
+	{
+		@Id long id;
+
+		@maxLength(255)
+		string username;
+
+		short age;
+	}
+	```
 
 ### Remove / Delete
 
 Use the `remove` method on the `DormDB` object to either delete an instance from the DB or start a `DELETE` operation. When passing in a Model instance or a [Patch](#patches) with the primary key field, it will be deleted immediately. When passing in a Model type as template parameter, a builder is returned. On this builder all methods immediately finish right now, so it's not strictly a builder, but rather groups together the different delete methods. You can call `byCondition`, `single` or `all` to actually perform the delete.
 
-```d
-// SELECT brand, color, serial_no FROM car
-auto car = db.select!Car.findOptional;
-if (!car.isNull)
-{
-	// DELETE FROM car WHERE serial_no = ?
-	db.remove(car.get);
-}
+=== "app.d"
 
-// DELETE FROM car WHERE serial_no > 1337
-db.remove!Car
-	.byCondition(c => c.serialNo.greaterThan(1337));
+	```d
+	// SELECT brand, color, serial_no FROM car
+	auto car = db.select!Car.findOptional;
+	if (!car.isNull)
+	{
+		// DELETE FROM car WHERE serial_no = ?
+		db.remove(car.get);
+	}
 
-// DELETE FROM car
-auto affectedRows = db.remove!Car.all();
-```
+	// DELETE FROM car WHERE serial_no > 1337
+	db.remove!Car
+		.byCondition(c => c.serialNo.greaterThan(1337));
+
+	// DELETE FROM car
+	auto affectedRows = db.remove!Car.all();
+	```
+
+=== "models.d"
+
+	```d
+	class Car : Model
+	{
+		@maxLength(255)
+		string brand;
+
+		@maxLength(255)
+		string color;
+
+		@primaryKey
+		long serialNo;
+	}
+	```
 
 ## Patches
 
@@ -262,25 +407,44 @@ Often you don't want to get every available column when querying data and often 
 
 Patch structs may be defined anywhere (can be put inside the `models` module or just before using them inside a method)
 
-```d
-@DormPatch!User
-struct UserNew
-{
-	string username;
-	short age;
-}
-```
+=== "app.d"
 
-This UserNew is now a patch for the User model and can be used in a variety of places to only specify a limit set of columns.
+	```d
+	@DormPatch!User
+	struct UserNew
+	{
+		string username;
+		short age;
+	}
+	```
 
-```d
-// INSERT OR ROLLBACK INTO user (username, age) VALUES ("foo", 42), ("bar", 0), ("baz", 1337)
-db.insert([
-	UserNew("foo", 42),
-	UserNew("bar", 0),
-	UserNew("baz", 1337),
-]);
-```
+	This UserNew is now a patch for the User model and can be used in a variety of places to only specify a limit set of columns.
+
+	```d
+	// INSERT OR ROLLBACK INTO user (username, age)
+	//   VALUES ("foo", 42), ("bar", 0), ("baz", 1337)
+	db.insert([
+		UserNew("foo", 42),
+		UserNew("bar", 0),
+		UserNew("baz", 1337),
+	]);
+	```
+
+	---
+
+=== "models.d"
+
+	```d
+	class User : Model
+	{
+		@Id long id;
+
+		@maxLength(255)
+		string username;
+
+		short age;
+	}
+	```
 
 When using `insert`, only the fields that are defined in the patch as well as `@constructValue` annotated fields will be included in the actual SQL insert statement. Everything else is checked by DORM to be done by the database / table, which would previously be created using the rorm-cli migrator. Forgetting fields in an insert will result in a compile time error if these fields don't have any attributes that make them auto-generated.
 
