@@ -243,6 +243,8 @@ The `parseTomlConfig!BareConfiguration("database.toml")` call reads the database
 ```d
 struct BareConfiguration
 {
+	import mir.serde : serdeKeys;
+
 	// make sure you put custom fields before database!
 
 	/// DORM database settings
