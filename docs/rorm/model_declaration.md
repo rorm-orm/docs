@@ -50,7 +50,7 @@ struct Order {
 	.. // fields missing to be functional
 
 	#[rorm(autoincrement)]
-	order_number: u64,
+	order_number: i64,
 }
 ```
 
