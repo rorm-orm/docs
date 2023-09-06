@@ -51,5 +51,9 @@ nav:
     - Getting Started: rorm/getting_started.md
     - Project Setup: rorm/project_setup.md
     - Model Declaration: rorm/model_declaration.md
+    - Relations: rorm/relations.md
+    - CRUD: rorm/crud.md
+    - Field access syntax: rorm/field_access_syntax.md
+    - Full Example: rorm/full_example.md
   - Developer information:
     - Style Guidelines: developer/guidelines.md

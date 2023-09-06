@@ -186,14 +186,10 @@ map in the best case to the order of placement in the source code.
 |    Type name    | Additional notes                    |
 |:---------------:|-------------------------------------|
 |    `varchar`    | `max_length` annotation is required | 
-|   `varbinary`   |                                     |
-|     `int8`      |                                     |
+|    `binary`     |                                     |
 |     `int16`     |                                     |
 |     `int32`     |                                     |
 |     `int64`     |                                     |
-|     `uint8`     |                                     |
-|    `uint16`     |                                     |
-|    `uint32`     |                                     |
 | `float_number`  |                                     |
 | `double_number` |                                     |
 |    `boolean`    |                                     |
@@ -202,4 +198,3 @@ map in the best case to the order of placement in the source code.
 |   `timestamp`   |                                     |
 |     `time`      |                                     |
 |    `choices`    | `choices` annotation is required    |
-|      `set`      |                                     |
