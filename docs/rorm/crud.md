@@ -1,131 +1,391 @@
-
 # CRUD
 
-To perform database operations, the handle `db` is given to a macro,
-which expands to a builder statement. In order to add information like
-conditions to an operation, the methods of that builder can be used.
+To perform database operations, one of the four crud macros is invoked.
 
-Consider this preamble for the following snippets:
+They all take an executor as their first argument (i.e. `&Database` or `&mut Transaction`)
+and the model whose table to interact with as its second argument.
+
+The macro evaluates into a builder whose methods can be chained to configure and execute the operation.
+
+The following examples are written using these models:
 
 ```rust
-use rorm::{delete, insert, query, update, Database};
+use rorm::prelude::*;
 
-#[derive(Clone, Model, Debug)]
-pub struct Car {
+#[derive(Model)]
+struct User {
+    #[rorm(id)]
+    id: i64,
+
+    #[rorm(max_length = 255, unique)]
+    username: String,
+
     #[rorm(max_length = 255)]
-    pub(crate) brand: String,
+    password: String,
 
+    posts: BackRef<field!(Post::F.user)>,
+}
+
+#[derive(Model)]
+struct Post {
+    #[rorm(id)]
+    id: i64,
+    
     #[rorm(max_length = 255)]
-    pub(crate) color: String,
-
-    #[rorm(primary_key)]
-    pub(crate) serial_no: i64,
+    message: String,
+    
+    user: ForeignKey<User>,
 }
 ```
 
 ## Query
 
-Use the `query!` macro to start a `SELECT` operation. It can be chained with an
-optional `.condition()` and collected with `.all()`, `.one()` or `.optional()`.
-
+In order to retrieve data from the database the `query!` macro is used:
 ```rust
-async fn query(db: &Database) {
-    // SELECT  id, username, age FROM user ;
-    let all_users = query!(db, User).all().await.unwrap();
-
-    // SELECT  id, username, age FROM user ;
-    let first_user = query!(db, User).one().await.unwrap();
-
-    // SELECT  id, username, age FROM user WHERE (age = 0);
-    let one_user_with_age_zero = query!(db, User)
-        .condition(User::FIELDS.age.equals(0))
-        .one()
-        .await
-        .unwrap();
-
-    // SELECT  id, username, age FROM user WHERE (age > 100);
-    let users_over_100 = query!(db, User)
-        .condition(User::FIELDS.age.greater(100))
+async fn query_example(db: &Database) -> Result<(), rorm::Error> {
+    let all_users: Vec<User> = query!(db, User)
         .all()
-        .await
-        .unwrap();
+        .await?;
+    
+    let bob: Option<User> = query!(db, User)
+        .condition(User::F.username.equals("bob"))
+        .optional()
+        .await;
+    if bob.is_none() {
+        println!("No user named bob was found");
+    }
+    
+    Ok(())
 }
 ```
 
-## Insert
+The last method called on the macro specifies how the query is resolved. The following four are available:
 
-Use the `insert!` macro to start an `INSERT` operation. It can be chained with
-`.single()` to add one instance or `.bulk()` to add a slice of instances.
+### `all()`
+Executes the query in a future which resolves to all rows matching the query.
+```rust
+let all_users: Vec<User> = query!(&db, User).all().await.unwrap();
+```
+
+### `one()`
+Executes the query in a future which resolves to exactly one row.
+(If no matching row is found, this will be treated as an error)
+```rust
+let user: User = query!(&db, User).one().await.unwrap();
+```
+
+### `optional()`
+Executes the query in a future which resolves to at most one row.
+```rust
+let user: Option<User> = query!(&db, User).optional().await.unwrap();
+```
+
+### `stream()`
+Behaves like `all()` but instead of returning a future which collects all resulting rows in a `Vec` before resolving,
+it produces a stream which has to be polled per row.
+
+If you're not comfortable with rust's async streams, you can always start using `all()` until you notice performance issues.
+
+### Add conditions
+The optional `.condition(...)` method can be invoked to add a condition the returned rows must satisfy.
+
+!!! note
+    This direclty corresponds to adding a `WHERE` clause in sql
+
+To construct conditions use a comparison method on the field syntax
+```
+User::F.username.equals("bob")
+^^^^^^^^^^        ^^^^^ - Value to compare against
+|          ^^^^^^
+|          |
+|          Comparison operator
+|
+Field to compare
+```
+
+The concrete comparisons available depend on the field's type.
+
+Non-exhaustive list of commonly used ones:
+`equals`, `not_equals`, `less_than`, `less_equals`, `greater_than`, `greater_equals`
+
+Conditions can then be combined using the `or!` and `and!` macros:
+```rust
+query!(db, User)
+    .condition(and!(
+        User::F.username.equals("alice"),
+        User::F.password.equals(leaked_pw)
+    ))
+    .optional()
+```
+
+### Customize what to select
+
+In its most basic usage (`query!(db, User)`) the query will select every column and return them in the model's struct.
+
+This can be customized by changing the macro's second argument.
+
+!!! note
+    The `query!` macro is somewhat unique with regards to its second argument.
+
+    The other macros won't behave comparibly.
+
+As simplest alternative a `Patch` can be specified instead of the whole `Model` to only select some columns:
 
 ```rust
-async fn insert(db: &Database) {
-    // INSERT OR ABORT INTO car (brand, color, serial_no) VALUES ('VW', 'black', 0);
-    insert!(db, Car)
-        .single(&Car {
-            brand: "VW".to_string(),
-            color: "black".to_string(),
-            serial_no: 0,
-        })
-        .await
-        .unwrap();
+#[derive(Patch)]
+#[rorm(model = "User")]
+struct UserWithoutPassword {
+    id: i64,
+    username: String,
+    posts: BackRef<field!(Post::F.user)>,
+}
 
-    // INSERT OR ROLLBACK INTO car (brand, color, serial_no) VALUES (?, ?, ?), (?, ?, ?), (?, ?, ?), ...;
-    let mut cars = vec![];
-    for i in 1..65536 {
-        cars.push(Car {
-            brand: "VW".to_string(),
-            color: "red".to_string(),
-            serial_no: i,
-        })
-    }
-    insert!(db, Car).bulk(&cars).await.unwrap();
+// Query every field from the struct UserWithoutPassword
+let users: Vec<UserWithoutPassword> = query!(db, UserWithoutPassword).all().await?;
+```
+
+This can get quite annoying when you have to specify a struct for every combination of fields you might want to query together.
+
+Therefore, you can use the field syntax to query tuples of fields:
+```rust
+// Only query the user's id and username
+let users: Vec<(i64, String)> =
+    query!(db, (User::F.id, User::F.username)).all().await?;
+```
+
+This syntax also work with relations:
+```rust
+let posts: Vec<(String, String)> =
+    query!(db, (Post::F.message, Post::F.user.username)).all().await?;
+```
+
+When you want to select your relations' fields and there are a lot of them, specifying them all like this can get quite verbose.
+On top of that due to rust limitations regarding tuples the is a maximum length of 32 on how many fields you can query in one go.
+To mitigate this there is a in between syntax combining individual fields with patches:
+
+```rust
+let posts: Vec<(String, UserWithoutPassword)> =
+    query!(db, (Post::F.message, Post::F.user as UserWithoutPassword)).all().await?;
+```
+
+### TODO
+`limit`, `offset`, `range`, `order_...`
+
+## Insert
+
+In order to create new rows in the database the insert! macro is used:
+
+```rust
+#[derive(Patch)]
+#[rorm(model = "User")]
+struct NewUser {
+    username: String,
+    password: String,
+}
+
+#[derive(Patch)]
+#[rorm(model = "Post")]
+struct NewPost {
+    message: String,
+    user: ForeignKey<User>,
+}
+
+async fn insert_example(db: &Database) -> Result<(), rorm::Error> {
+    // insert a single user
+    insert!(db, NewUser).single(&NewUser {
+        username: "alice".to_string(),
+        password: "Secure-123".to_string(),
+    }).await?;
+
+    // insert a collection of user posts
+    let posts: Vec<> = vec![...];
+    insert!(db, NewPost).bulk(&posts).await?;
+    
+    Ok(())
+}
+```
+
+!!! note
+    Since the `id` field is annotated with `#[rorm(id)]` it is set by the database.
+
+    Therefore, we mustn't set it ourselves. 
+    So we declare a patch (`NewUser` or `NewPost`) which doesn't contain it and insert that
+    instead of the model structs themselves.
+
+But what if you need the values of fields which are set by the database?
+
+### Returning
+
+The `insert!` macro returns the whole model it just inserted:
+
+```rust
+#[derive(Patch)]
+#[rorm(model = "User")]
+struct NewUser {
+    username: String,
+    password: String,
+}
+
+// Note that the type `User` is returned instead of just a `NewUser`
+let new_user: User = insert!(db, NewUser).single(&NewUser {..}).await?;
+```
+
+To customize the behaviour, a family of `.return_...()` methods are provided:
+```rust
+pub async fn show_various_returns(db: &Database, user: &NewUser) -> Result<(), Error> {
+    // Return model instance by default
+    let _: User = insert!(db, NewUser)
+        .single(user)
+        .await?;
+
+    // Return a patch's instance instead of whole model
+    // (including the one used to insert and the model itself)
+    let _: AnotherUserPatch = insert!(db, NewUser)
+        .return_patch::<UserPatch>()
+        .single(user)
+        .await?;
+
+    // Return a tuple of fields
+    let _: (i64, String) = insert!(db, NewUser)
+        .return_tuple((User::F.id, User::F.name))
+        .single(user)
+        .await?;
+
+    // Return the model's primary key
+    let _: i64 = insert!(db, NewUser)
+        .return_primary_key()
+        .single(user)
+        .await?;
+
+    // Return nothing
+    let _: () = insert!(db, NewUser)
+        .return_nothing()
+        .single(user)
+        .await?;
+
+    Ok(())
 }
 ```
 
 ## Update
 
-Use the `update!` macro to start an `UPDATE` operation. Chain it with
-one or more `.set()` calls to update the column values as well as an
-optional filter with `.condition()`.
+In order to models' fields the `update!` macro is used:
 
 ```rust
-async fn update(db: &Database) {
-    // UPDATE OR ABORT user SET username = 'user';
-    update!(db, User).set(User::FIELDS.username, "user").await;
-
-    // UPDATE OR ABORT user SET username = 'boss', age = 42 WHERE (id = 1);
+pub async fn set_good_password(db: &Database) -> Result<(), rorm::Error> {
     update!(db, User)
-        .set(User::FIELDS.username, "boss")
-        .set(User::FIELDS.age, 42)
-        .condition(User::FIELDS.id.equals(1))
-        .await;
+        .set(User::F.password, "I am way more secure™".to_string())
+        .condition(User::F.password.equals("password"))
+        .await?;
+    Ok(())
+}
+```
+
+### Dynamic mode and `set_if`
+
+Before executing the query `set` has to be called at least once
+to set a value to set for a column (The first call changes the builders type).
+Otherwise the query wouldn't do anything.
+
+This can be limiting when your calls are made conditionally.
+
+To support this, the builder can be put into a "dynamic" mode by calling `begin_dyn_set`.
+Then calls to `set` won't change the type.
+When you're done use `finish_dyn_set` to go back to "normal" mode.
+It will check the number of "sets" and return `Result` which is `Ok` for at least one and an `Err` for zero.
+Both variants contain the builder in "normal" mode to continue.
+
+A common pattern for dynamic mode is to check a bunch of `Option`s and inserting the `Some`s:
+```rust
+async fn update_user(
+    db: &Database,
+    user_id: i64,
+    optional_new_username: Option<String>,
+    optional_new_password: Option<String>
+) -> Result<(), rorm::Error> {
+    let mut updater = update!(db, User)
+        .condition(User::F.id.equals(user_id))
+        .begin_dyn_set();
+
+    if let Some(new_username) = optional_new_username {
+        updater = updater.set(User::F.username, new_username);
+    }
+    if let Some(new_password) = optional_new_password {
+        updater = updater.set(User::F.password, new_password);
+    }
+
+    match updater.finish_dyn_set() {
+        Ok(updater) => updater.await?,
+        Err(_) => println!("Nothing to update"),
+    }
+    
+    Ok(())
+}
+```
+
+This can be simplified using the `set_if` method which takes an `Option` and calls `set` internally if the option is `Some`:
+```rust
+async fn update_user(
+    db: &Database,
+    user_id: i64,
+    optional_new_username: Option<String>,
+    optional_new_password: Option<String>
+) -> Result<(), rorm::Error> {
+    let updater = update!(db, User)
+        .condition(User::F.id.equals(user_id))
+        .set_if(User::F.username, optional_new_username)
+        .set_if(User::F.password, optional_new_password);
+    
+    match updater.finish_dyn_set() {
+        Ok(updater) => updater.await?,
+        Err(_) => println!("Nothing to update"),
+    }
+
+    Ok(())
 }
 ```
 
 ## Delete
 
-Use the `delete!` macro to start a `DELETE` operation. Either chain it with
-`.all()` to clear the whole table, with `.single()` to delete a model
-instance or with `.condition()` to set an explicit filter for the deletion.
+In order to create new rows in the database the `delete!` macro is used:
 
 ```rust
-async fn delete(db: &Database) {
-    // DELETE FROM car ;
-    delete!(db, Car).all().await.expect("failed to delete all");
-
-    // SELECT  brand, color, serial_no FROM car ;
-    // DELETE FROM car WHERE (serial_no = ?) ;
-    if let Some(car) = query!(db, Car).optional().await.unwrap() {
-        delete!(db, Car)
-            .single(&car)
-            .await
-            .expect("failed to delete one");
-    }
-
-    // DELETE FROM car WHERE (serial_no > 1337) ;
-    delete!(db, Car)
-        .condition(Car::FIELDS.serial_no.greater(1337))
-        .await
-        .expect("failed to delete some");
+pub async fn delete_single_user(db: &Database, user: &UserPatch) -> Result<(), rorm::Error> {
+    delete!(db, User)
+        .single(user)
+        .await?;
+    Ok(())
+}
+pub async fn delete_many_users(db: &Database, users: &[UserPatch]) -> Result<(), rorm::Error> {
+    delete!(db, User)
+        .bulk(users)
+        .await?;
+    Ok(())
+}
+pub async fn delete_underage(db: &Database) -> Result<(), rorm::Error> {
+    let num_deleted: u64 = delete!(db, User)
+        .condition(User::F.age.less_equals(18))
+        .await?;
+    Ok(())
 }
 ```
+
+A `delete!` is quite simple. It expects only one of four methods which specify what to delete:
+
+### `.single(...)`
+To delete a single row, use the `single` method and pass it the model to delete.
+
+!!! note
+    `single` doesn't require the actual model. It accepts any patch which contains the primary key.
+
+### `.bulk(...)`
+`bulk` is used like `single` but takes an iterator of instances and deletes all at once.
+
+### `.condition(...)`
+When you need more complex deleting logic than just concrete instance, you can use the `conditon` method.
+Any row which matches the provided condition will be deleted.
+
+See [query](crud.md#add-conditions) for how conditions look.
+
+### `all()`
+For the case where you'd want to whip the whole table, you can use the `all` method
