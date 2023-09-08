@@ -1,0 +1,24 @@
+---
+name: Deployment of rorm-docs
+
+concurrency:
+  group: production
+  cancel-in-progress: true
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deployment:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v3
+      - uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: deploy to server
+        run: |
+          ssh -o "StrictHostKeyChecking accept-new" gh-deploy@{{ secrets.SERVER_IP }} "/bin/bash /home/gh-deploy/deploy.sh"
