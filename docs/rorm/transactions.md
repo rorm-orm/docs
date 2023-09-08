@@ -24,8 +24,8 @@ with the difference that the instance must be provided as mutable reference.
 There are two possible options to end a transaction:
 
 
-* `commit()`: This will end the transaction and apply all modifications to the database
-* `rollback()`: This will end the transaction and rollback all modifications
+* `commit()` This will end the transaction and apply all modifications to the database
+* `rollback()` This will end the transaction and rollback all modifications
 
 !!! tip
 
