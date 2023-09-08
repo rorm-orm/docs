@@ -53,6 +53,7 @@ nav:
     - Model Declaration: rorm/model_declaration.md
     - Relations: rorm/relations.md
     - CRUD: rorm/crud.md
+    - Transactions: rorm/transactions.md
     - Field access syntax: rorm/field_access_syntax.md
     - Full Example: rorm/full_example.md
   - Developer information:
