@@ -8,8 +8,7 @@ model `T`.
 
 
 ```rust
-use rorm::fields::ForeignKey;
-use rorm::Model;
+use rorm::prelude::*;
 
 #[derive(Model)]
 struct Post {

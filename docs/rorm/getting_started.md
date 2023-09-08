@@ -91,7 +91,7 @@ especially if you want to take some additional configuration for your setup.
 ## Define a model
 
 ```rust
-use rorm::Model;
+use rorm::prelude::*;
 
 #[derive(Model)]
 pub struct User {
