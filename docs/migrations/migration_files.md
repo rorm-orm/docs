@@ -223,6 +223,34 @@ Name = "foo"
 Name = "counter"
 ```
 
+#### Raw SQL Operation
+
+This operation performs raw SQL statements on the database.
+
+!!! warning
+    `make-migrations` can no longer generate any migration files once you have a raw SQL operation in your migration steps.
+
+```toml
+[[Migration.Operations]]
+Type = "RawSQL"
+
+# Set this to true to indicate that this SQL statement does not affect the
+# internal model representation.
+# Setting this to true will also keep `make-migrations` working, since it will
+# generate future migrations assuming that this SQL statement did not change
+# the model state.
+StructureSafe = false
+
+# single SQL statement on SQLite databases
+SQLite = ""
+
+# single SQL statement on PostgreSQL databases
+Postgres = ""
+
+# single SQL statement on MySQL databases
+MySQL = ""
+```
+
 ### Field types
 
 ### Annotation types
