@@ -2,7 +2,7 @@
 
 ## Foreign Keys
 
-You can use the type `ForeignKey<T>` where `T` is any type that derives 
+You can use the type `ForeignModel<T>` where `T` is any type that derives 
 also `Model`. It will create a reference to the primary key of the
 model `T`.
 
@@ -15,7 +15,7 @@ struct Post {
     #[rorm(id)]
     id: i64,
     
-    creator: ForeignKey<User>,
+    creator: ForeignModel<User>,
 }
 
 #[derive(Model)]
@@ -27,7 +27,7 @@ struct User {
 
 !!! tip
 
-    You can point a `ForeignKey<T>` to the `Model` its contained in to 
+    You can point a `ForeignModel<T>` to the `Model` its contained in to 
     build self-refenencing structs.
 
     ```rust
@@ -38,13 +38,13 @@ struct User {
         #[rorm(id)]
         id: i64,
     
-        creator: ForeignKey<Post>,
+        creator: ForeignModel<Post>,
     }
     ```
 
 ### Foreign keys on non-primary keys
 
-With `ForeignKey` it is not possible to reference a non-primary key.
+With `ForeignModel` it is not possible to reference a non-primary key.
 In order to support this use case, the slightly more verbose 
 `ForeignModelByField<T>` type was created.
 
@@ -59,7 +59,7 @@ struct Post {
     #[rorm(id)]
     id: i64,
     
-    creator_aid: ForeignKeyByField<field!(User::F.another_id)>,
+    creator_aid: ForeignModelByField<field!(User::F.another_id)>,
 }
 
 #[derive(Model)]
@@ -76,7 +76,7 @@ struct User {
 ## Backrefs
 
 A backref is the (virtual) reference to be able to query 
-"all items of a specific model with a `ForeignKey` pointing to the model on 
+"all items of a specific model with a `ForeignModel` pointing to the model on 
 which the backref is defined on."
 
 ```rust
