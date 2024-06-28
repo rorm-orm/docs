@@ -94,3 +94,50 @@ pub async fn create_user(
     Ok(())
 }
 ```
+
+## Using a Guard
+
+When a single transaction may be used across function calls,
+or when either a transaction or the database itself may be passed to
+these functions, a `TransactionGuard` can be used. It can be
+retrieved by an `Executor`, which is implemented by both the
+`Transaction` and `Database`. The guard is responsible for
+committing the transaction if necessary; since mid-transaction
+commits are not supported, this is a no-op when the guard was
+created from a transaction and will perform the commit if the
+guard was created from a database.
+
+```rust
+async fn create_user(username: String, exe: impl Executor<'_>) -> Result<(), rorm::Error> {
+    // The guard will either be a new transaction or an
+    // existing one, depending on the Executor
+    let mut guard = exe.ensure_transaction().await?;
+
+    // It can be used very similar to a normal transaction
+    // through `get_transaction`
+    insert!(guard.get_transaction(), UserInsert)
+        .return_primary_key()
+        .single(&UserInsert { username })
+        .await?;
+
+    guard.commit()?;
+    Ok(())
+}
+
+async fn test_double_creation(db: &Database) -> Result<(), rorm:Error> {
+    // Start a transaction
+    let mut tx = db.start_transaction().await?;
+
+    // The first call will work but not commit the transaction
+    create_user("username".to_string(), &mut tx).await?;
+
+    // The second call will also work but not commit the transaction
+    create_user("another username".to_string(), &mut tx).await?;
+
+    // Commit the transaction, since the guard's commit
+    // in `create_user` is a no-op there
+    tx.commit().await?;
+
+    Ok(())
+}
+```
