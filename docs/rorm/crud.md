@@ -1,6 +1,6 @@
 # CRUD
 
-To perform database operations, one of the four crud macros is invoked.
+To perform database operations, one of the four CRUD macros is invoked.
 
 They all take an executor as their first argument (i.e. `&Database` or `&mut Transaction`)
 and the model whose table to interact with as its second argument.
@@ -173,7 +173,7 @@ let posts: Vec<(String, UserWithoutPassword)> =
 
 ## Insert
 
-In order to create new rows in the database the insert! macro is used:
+In order to create new rows in the database, the `insert!` macro is used:
 
 ```rust
 #[derive(Patch)]
@@ -269,7 +269,7 @@ pub async fn show_various_returns(db: &Database, user: &NewUser) -> Result<(), E
 
 ## Update
 
-In order to models' fields the `update!` macro is used:
+In order to change models' fields the `update!` macro is used:
 
 ```rust
 pub async fn set_good_password(db: &Database) -> Result<(), rorm::Error> {
@@ -283,15 +283,15 @@ pub async fn set_good_password(db: &Database) -> Result<(), rorm::Error> {
 
 ### Dynamic mode and `set_if`
 
-Before executing the query `set` has to be called at least once
-to set a value to set for a column (The first call changes the builders type).
+Before executing the query, `set` has to be called at least once
+to set a value for a column (the first call changes the builder's type).
 Otherwise the query wouldn't do anything.
 
 This can be limiting when your calls are made conditionally.
 
 To support this, the builder can be put into a "dynamic" mode by calling `begin_dyn_set`.
 Then calls to `set` won't change the type.
-When you're done use `finish_dyn_set` to go back to "normal" mode.
+When you're done, use `finish_dyn_set` to go back to "normal" mode.
 It will check the number of "sets" and return `Result` which is `Ok` for at least one and an `Err` for zero.
 Both variants contain the builder in "normal" mode to continue.
 
@@ -382,10 +382,11 @@ To delete a single row, use the `single` method and pass it the model to delete.
 `bulk` is used like `single` but takes an iterator of instances and deletes all at once.
 
 ### `.condition(...)`
-When you need more complex deleting logic than just concrete instance, you can use the `conditon` method.
+When you need more complex deleting logic than just some concrete instances,
+you can use the `conditon` method.
 Any row which matches the provided condition will be deleted.
 
 See [query](crud.md#add-conditions) for how conditions look.
 
 ### `all()`
-For the case where you'd want to whip the whole table, you can use the `all` method
+For the case where you'd want to wipe the whole table, you can use the `all` method.
