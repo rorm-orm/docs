@@ -97,9 +97,8 @@ pub async fn create_user(
 
 ## Using a Guard
 
-When a single transaction may be used across function calls,
-or when either a transaction or the database itself may be passed to
-these functions, a `TransactionGuard` can be used. It can be
+When either a transaction or the database itself may be passed
+to a function, a `TransactionGuard` can be used. It can be
 retrieved by an `Executor`, which is implemented by both the
 `Transaction` and `Database`. The guard is responsible for
 committing the transaction if necessary; since mid-transaction
