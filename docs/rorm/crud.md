@@ -90,15 +90,15 @@ If you're not comfortable with rust's async streams, you can always start using 
 The optional `.condition(...)` method can be invoked to add a condition the returned rows must satisfy.
 
 !!! note
-    This direclty corresponds to adding a `WHERE` clause in sql
+    This directly corresponds to adding a `WHERE` clause in sql
 
 To construct conditions use a comparison method on the field syntax
 ```
 User::F.username.equals("bob")
-^^^^^^^^^^        ^^^^^ - Value to compare against
-|          ^^^^^^
-|          |
-|          Comparison operator
+^^^^^^^^^^^^^^^^        ^^^^^ - Value to compare against
+|                ^^^^^^
+|                |
+|                Comparison operator
 |
 Field to compare
 ```
@@ -125,7 +125,7 @@ In its most basic usage (`query!(db, User)`) the query will select every column 
 This can be customized by changing the macro's second argument.
 
 !!! note
-    The `query!` macro is somewhat unique with regards to its second argument.
+    The `query!` macro is somewhat unique in regard to its second argument.
 
     The other macros won't behave comparibly.
 
@@ -160,16 +160,38 @@ let posts: Vec<(String, String)> =
 ```
 
 When you want to select your relations' fields and there are a lot of them, specifying them all like this can get quite verbose.
-On top of that due to rust limitations regarding tuples the is a maximum length of 32 on how many fields you can query in one go.
-To mitigate this there is a in between syntax combining individual fields with patches:
+On top of that, due to rust limitations regarding tuples, the maximum number of fields you can query in one go is 32.
+To mitigate this, there is a syntax combining individual fields with patches:
 
 ```rust
 let posts: Vec<(String, UserWithoutPassword)> =
     query!(db, (Post::F.message, Post::F.user as UserWithoutPassword)).all().await?;
 ```
 
-### TODO
-`limit`, `offset`, `range`, `order_...`
+#### Limit & offset
+
+Just as you would expect them, the `.limit(u64)` and `.offset(u64)` functions can be used to add limits and offsets
+to the SQL query. Note that `.limit()` can not be combined with `.one()`, since the latter already adds a limit of 1.
+Also, the `.offset()` can not be used without a limit. The following examples illustrate possible uses:
+
+```rust
+query!(db, Post).limit(10).all().await?;
+query!(db, Post).offset(13).one().await?;
+query!(db, Post).limit(10).offset(42).all().await?;
+query!(db, Post).limit(100).offset(1337).stream();
+```
+
+There is also the `.range()` function which provides a convenient way to add both the limit and offset.
+Mixing a range with the previous functions for limit and offset is not allowed.
+Thus, the following example will return at most 10 elements since it corresponds to limit 10 and offset 30:
+
+```rust
+query!(db, Post).range(30..40).all().await?;
+```
+
+#### Ordering
+
+TODO: `order_...`
 
 ## Insert
 
@@ -347,7 +369,7 @@ async fn update_user(
 
 ## Delete
 
-In order to create new rows in the database the `delete!` macro is used:
+In order to delete rows from a table, the `delete!` macro is used:
 
 ```rust
 pub async fn delete_single_user(db: &Database, user: &UserPatch) -> Result<(), rorm::Error> {
