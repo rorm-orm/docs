@@ -65,8 +65,8 @@ pub async fn create_user(
     let mut tx = db.start_transaction().await?;
 
     // Check if the username is already taken
-    let is_taken = query!(&mut tx, (User::F.id,))
-        .condition(User::F.username.equals(&username))
+    let is_taken = query!(&mut tx, (User.id,))
+        .condition(User.username.equals(&username))
         .optional()
         .await?
         .is_some();

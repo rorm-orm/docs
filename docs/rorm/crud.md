@@ -23,7 +23,7 @@ struct User {
     #[rorm(max_length = 255)]
     password: String,
 
-    posts: BackRef<field!(Post::F.user)>,
+    posts: BackRef<field!(Post.user)>,
 }
 
 #[derive(Model)]
@@ -48,7 +48,7 @@ async fn query_example(db: &Database) -> Result<(), rorm::Error> {
         .await?;
     
     let bob: Option<User> = query!(db, User)
-        .condition(User::F.username.equals("bob"))
+        .condition(User.username.equals("bob"))
         .optional()
         .await;
     if bob.is_none() {
@@ -94,11 +94,11 @@ The optional `.condition(...)` method can be invoked to add a condition the retu
 
 To construct conditions use a comparison method on the field syntax
 ```
-User::F.username.equals("bob")
-^^^^^^^^^^^^^^^^        ^^^^^ - Value to compare against
-|                ^^^^^^
-|                |
-|                Comparison operator
+User.username.equals("bob")
+^^^^^^^^^^^^^        ^^^^^ - Value to compare against
+|             ^^^^^^
+|             |
+|             Comparison operator
 |
 Field to compare
 ```
@@ -112,8 +112,8 @@ Conditions can then be combined using the `or!` and `and!` macros:
 ```rust
 query!(db, User)
     .condition(and!(
-        User::F.username.equals("alice"),
-        User::F.password.equals(leaked_pw)
+        User.username.equals("alice"),
+        User.password.equals(leaked_pw)
     ))
     .optional()
 ```
@@ -137,7 +137,7 @@ As simplest alternative a `Patch` can be specified instead of the whole `Model` 
 struct UserWithoutPassword {
     id: i64,
     username: String,
-    posts: BackRef<field!(Post::F.user)>,
+    posts: BackRef<field!(Post.user)>,
 }
 
 // Query every field from the struct UserWithoutPassword
@@ -150,13 +150,13 @@ Therefore, you can use the field syntax to query tuples of fields:
 ```rust
 // Only query the user's id and username
 let users: Vec<(i64, String)> =
-    query!(db, (User::F.id, User::F.username)).all().await?;
+    query!(db, (User.id, User.username)).all().await?;
 ```
 
 This syntax also work with relations:
 ```rust
 let posts: Vec<(String, String)> =
-    query!(db, (Post::F.message, Post::F.user.username)).all().await?;
+    query!(db, (Post.message, Post.user.username)).all().await?;
 ```
 
 When you want to select your relations' fields and there are a lot of them, specifying them all like this can get quite verbose.
@@ -165,7 +165,7 @@ To mitigate this, there is a syntax combining individual fields with patches:
 
 ```rust
 let posts: Vec<(String, UserWithoutPassword)> =
-    query!(db, (Post::F.message, Post::F.user as UserWithoutPassword)).all().await?;
+    query!(db, (Post.message, Post.user as UserWithoutPassword)).all().await?;
 ```
 
 #### Limit & offset
@@ -269,7 +269,7 @@ pub async fn show_various_returns(db: &Database, user: &NewUser) -> Result<(), E
 
     // Return a tuple of fields
     let _: (i64, String) = insert!(db, NewUser)
-        .return_tuple((User::F.id, User::F.name))
+        .return_tuple((User.id, User.name))
         .single(user)
         .await?;
 
@@ -296,8 +296,8 @@ In order to change models' fields the `update!` macro is used:
 ```rust
 pub async fn set_good_password(db: &Database) -> Result<(), rorm::Error> {
     update!(db, User)
-        .set(User::F.password, "I am way more secure™".to_string())
-        .condition(User::F.password.equals("password"))
+        .set(User.password, "I am way more secure™".to_string())
+        .condition(User.password.equals("password"))
         .await?;
     Ok(())
 }
@@ -326,14 +326,14 @@ async fn update_user(
     optional_new_password: Option<String>
 ) -> Result<(), rorm::Error> {
     let mut updater = update!(db, User)
-        .condition(User::F.id.equals(user_id))
+        .condition(User.id.equals(user_id))
         .begin_dyn_set();
 
     if let Some(new_username) = optional_new_username {
-        updater = updater.set(User::F.username, new_username);
+        updater = updater.set(User.username, new_username);
     }
     if let Some(new_password) = optional_new_password {
-        updater = updater.set(User::F.password, new_password);
+        updater = updater.set(User.password, new_password);
     }
 
     match updater.finish_dyn_set() {
@@ -354,9 +354,9 @@ async fn update_user(
     optional_new_password: Option<String>
 ) -> Result<(), rorm::Error> {
     let updater = update!(db, User)
-        .condition(User::F.id.equals(user_id))
-        .set_if(User::F.username, optional_new_username)
-        .set_if(User::F.password, optional_new_password);
+        .condition(User.id.equals(user_id))
+        .set_if(User.username, optional_new_username)
+        .set_if(User.password, optional_new_password);
     
     match updater.finish_dyn_set() {
         Ok(updater) => updater.await?,
@@ -386,7 +386,7 @@ pub async fn delete_many_users(db: &Database, users: &[UserPatch]) -> Result<(),
 }
 pub async fn delete_underage(db: &Database) -> Result<(), rorm::Error> {
     let num_deleted: u64 = delete!(db, User)
-        .condition(User::F.age.less_equals(18))
+        .condition(User.age.less_equals(18))
         .await?;
     Ok(())
 }

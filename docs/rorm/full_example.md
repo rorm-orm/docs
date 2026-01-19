@@ -73,16 +73,16 @@ async fn main() {
     // Update the second user by increasing its age
     let all_users = query!(&db, User).all().await.expect("error");
     update!(&db, User)
-        .set(User::FIELDS.age, all_users[2].age + 1)
-        .condition(User::FIELDS.id.equals(all_users[2].id))
+        .set(User.age, all_users[2].age + 1)
+        .condition(User.id.equals(all_users[2].id))
         .await
         .expect("error");
 
     // Delete some user with age 69 or older than 100 years
     let zero_aged_user = query!(&db, User)
         .condition(or!(
-            User::FIELDS.age.greater(100),
-            User::F.age.equals(69)
+            User.age.greater(100),
+            User.age.equals(69)
         ))
         .one()
         .await

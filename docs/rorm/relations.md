@@ -59,7 +59,7 @@ struct Post {
     #[rorm(id)]
     id: i64,
     
-    creator_aid: ForeignModelByField<field!(User::F.another_id)>,
+    creator_aid: ForeignModelByField<field!(User.another_id)>,
 }
 
 #[derive(Model)]
@@ -95,7 +95,7 @@ struct User {
     #[rorm(id)]
     id: i64,
     
-    posts: BackRef<field!(Post::F.creator)>
+    posts: BackRef<field!(Post.creator)>
 }
 ```
 
