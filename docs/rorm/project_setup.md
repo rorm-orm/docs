@@ -1,5 +1,10 @@
 # Project setup
 
+!!! warning
+
+    This page is outdated and does not reflect the current
+    recommendations of the rorm authors.
+
 Install the necessary CLI tools:
 ```bash
 cargo install -f cargo-make rorm-cli
