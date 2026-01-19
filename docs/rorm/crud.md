@@ -325,9 +325,7 @@ async fn update_user(
     optional_new_username: Option<String>,
     optional_new_password: Option<String>
 ) -> Result<(), rorm::Error> {
-    let mut updater = update!(db, User)
-        .condition(User.id.equals(user_id))
-        .begin_dyn_set();
+    let mut updater = update!(db, User).begin_dyn_set();
 
     if let Some(new_username) = optional_new_username {
         updater = updater.set(User.username, new_username);
@@ -337,7 +335,7 @@ async fn update_user(
     }
 
     match updater.finish_dyn_set() {
-        Ok(updater) => updater.await?,
+        Ok(updater) => updater.condition(User.id.equals(user_id)).await?,
         Err(_) => println!("Nothing to update"),
     }
     
@@ -354,12 +352,12 @@ async fn update_user(
     optional_new_password: Option<String>
 ) -> Result<(), rorm::Error> {
     let updater = update!(db, User)
-        .condition(User.id.equals(user_id))
+        .begin_dyn_set()
         .set_if(User.username, optional_new_username)
         .set_if(User.password, optional_new_password);
     
     match updater.finish_dyn_set() {
-        Ok(updater) => updater.await?,
+        Ok(updater) => updater.condition(User.id.equals(user_id)).await?,
         Err(_) => println!("Nothing to update"),
     }
 
