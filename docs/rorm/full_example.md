@@ -8,7 +8,7 @@ delete some. Note that this is just the most basic functionality, but
 ```rust
 use std::fs::read_to_string;
 
-use rorm::{delete, insert, update, query, Database};
+use rorm::Database;
 use rorm::config::DatabaseConfig;
 use serde::Deserialize;
 
@@ -41,7 +41,7 @@ async fn main() {
     .expect("error connecting to the database");
 
     // Query all users from the database
-    for user in query!(&db, User)
+    for user in rorm::query(&db, User)
         .all()
         .await
         .expect("querying failed")
@@ -53,7 +53,7 @@ async fn main() {
     }
 
     // Add three new users to the database
-    insert!(&db, UserNew)
+    rorm::insert(&db, UserNew)
         .bulk(&[
             UserNew {
                 username: "foo".to_string(),
@@ -71,15 +71,15 @@ async fn main() {
         .await;
 
     // Update the second user by increasing its age
-    let all_users = query!(&db, User).all().await.expect("error");
-    update!(&db, User)
+    let all_users = rorm::query(&db, User).all().await.expect("error");
+    rorm::update(&db, User)
         .set(User.age, all_users[2].age + 1)
         .condition(User.id.equals(all_users[2].id))
         .await
         .expect("error");
 
     // Delete some user with age 69 or older than 100 years
-    let zero_aged_user = query!(&db, User)
+    let zero_aged_user = rorm::query(&db, User)
         .condition(or!(
             User.age.greater(100),
             User.age.equals(69)
@@ -87,6 +87,6 @@ async fn main() {
         .one()
         .await
         .expect("error");
-    delete!(&db, User).single(&zero_aged_user).await;
+    rorm::delete(&db, User).single(&zero_aged_user).await;
 }
 ```

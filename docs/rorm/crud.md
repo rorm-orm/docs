@@ -1,11 +1,10 @@
 # CRUD
 
-To perform database operations, one of the four CRUD macros is invoked.
+To perform database operations, one of the four CRUD builders is used.
 
-They all take an executor as their first argument (i.e. `&Database` or `&mut Transaction`)
-and the model whose table to interact with as its second argument.
-
-The macro evaluates into a builder whose methods can be chained to configure and execute the operation.
+They are all started by a function with two arguments.
+The first argument is an executor (i.e. `&Database` or `&mut Transaction`)
+and the second argument is the model whose table to interact with.
 
 The following examples are written using these models:
 
@@ -40,14 +39,14 @@ struct Post {
 
 ## Query
 
-In order to retrieve data from the database the `query!` macro is used:
+To retrieve data from the database the `rorm::query` builder is used:
 ```rust
 async fn query_example(db: &Database) -> Result<(), rorm::Error> {
-    let all_users: Vec<User> = query!(db, User)
+    let all_users: Vec<User> = rorm::query(db, User)
         .all()
         .await?;
     
-    let bob: Option<User> = query!(db, User)
+    let bob: Option<User> = rorm::query(db, User)
         .condition(User.username.equals("bob"))
         .optional()
         .await;
@@ -59,25 +58,25 @@ async fn query_example(db: &Database) -> Result<(), rorm::Error> {
 }
 ```
 
-The last method called on the macro specifies how the query is resolved. The following four are available:
+The last method called on the builder specifies how the query is resolved. The following four are available:
 
 ### `all()`
 Executes the query in a future which resolves to all rows matching the query.
 ```rust
-let all_users: Vec<User> = query!(&db, User).all().await.unwrap();
+let all_users: Vec<User> = rorm::query(&db, User).all().await.unwrap();
 ```
 
 ### `one()`
 Executes the query in a future which resolves to exactly one row.
 (If no matching row is found, this will be treated as an error)
 ```rust
-let user: User = query!(&db, User).one().await.unwrap();
+let user: User = rorm::query(&db, User).one().await.unwrap();
 ```
 
 ### `optional()`
 Executes the query in a future which resolves to at most one row.
 ```rust
-let user: Option<User> = query!(&db, User).optional().await.unwrap();
+let user: Option<User> = rorm::query(&db, User).optional().await.unwrap();
 ```
 
 ### `stream()`
@@ -110,7 +109,7 @@ Non-exhaustive list of commonly used ones:
 
 Conditions can then be combined using the `or!` and `and!` macros:
 ```rust
-query!(db, User)
+rorm::query(db, User)
     .condition(and!(
         User.username.equals("alice"),
         User.password.equals(leaked_pw)
@@ -120,16 +119,16 @@ query!(db, User)
 
 ### Customize what to select
 
-In its most basic usage (`query!(db, User)`) the query will select every column and return them in the model's struct.
+In its most basic usage (`rorm::query(db, User)`) the query will select every column and return them in the model's struct.
 
-This can be customized by changing the macro's second argument.
+This can be customized by changing the function's second argument.
 
 !!! note
-    The `query!` macro is somewhat unique in regard to its second argument.
+    The `rorm::query` builder is somewhat unique in regard to its second argument.
 
-    The other macros won't behave comparibly.
+    The other builders won't behave comparibly.
 
-As simplest alternative a `Patch` can be specified instead of the whole `Model` to only select some columns:
+As the simplest alternative a `Patch` can be specified instead of the whole `Model` to only select some columns:
 
 ```rust
 #[derive(Patch)]
@@ -141,7 +140,7 @@ struct UserWithoutPassword {
 }
 
 // Query every field from the struct UserWithoutPassword
-let users: Vec<UserWithoutPassword> = query!(db, UserWithoutPassword).all().await?;
+let users: Vec<UserWithoutPassword> = rorm::query(db, UserWithoutPassword).all().await?;
 ```
 
 This can get quite annoying when you have to specify a struct for every combination of fields you might want to query together.
@@ -150,13 +149,13 @@ Therefore, you can use the field syntax to query tuples of fields:
 ```rust
 // Only query the user's id and username
 let users: Vec<(i64, String)> =
-    query!(db, (User.id, User.username)).all().await?;
+    rorm::query(db, (User.id, User.username)).all().await?;
 ```
 
 This syntax also work with relations:
 ```rust
 let posts: Vec<(String, String)> =
-    query!(db, (Post.message, Post.user.username)).all().await?;
+    rorm::query(db, (Post.message, Post.user.username)).all().await?;
 ```
 
 When you want to select your relations' fields and there are a lot of them, specifying them all like this can get quite verbose.
@@ -165,7 +164,7 @@ To mitigate this, there is a syntax combining individual fields with patches:
 
 ```rust
 let posts: Vec<(String, UserWithoutPassword)> =
-    query!(db, (Post.message, Post.user as UserWithoutPassword)).all().await?;
+    rorm::query(db, (Post.message, Post.user.query_as(UserWithoutPassword))).all().await?;
 ```
 
 #### Limit & offset
@@ -175,10 +174,10 @@ to the SQL query. Note that `.limit()` can not be combined with `.one()`, since 
 Also, the `.offset()` can not be used without a limit. The following examples illustrate possible uses:
 
 ```rust
-query!(db, Post).limit(10).all().await?;
-query!(db, Post).offset(13).one().await?;
-query!(db, Post).limit(10).offset(42).all().await?;
-query!(db, Post).limit(100).offset(1337).stream();
+rorm::query(db, Post).limit(10).all().await?;
+rorm::query(db, Post).offset(13).one().await?;
+rorm::query(db, Post).limit(10).offset(42).all().await?;
+rorm::query(db, Post).limit(100).offset(1337).stream();
 ```
 
 There is also the `.range()` function which provides a convenient way to add both the limit and offset.
@@ -186,7 +185,7 @@ Mixing a range with the previous functions for limit and offset is not allowed.
 Thus, the following example will return at most 10 elements since it corresponds to limit 10 and offset 30:
 
 ```rust
-query!(db, Post).range(30..40).all().await?;
+rorm::query(db, Post).range(30..40).all().await?;
 ```
 
 #### Ordering
@@ -195,7 +194,7 @@ TODO: `order_...`
 
 ## Insert
 
-In order to create new rows in the database, the `insert!` macro is used:
+To create new rows in the database, the `rorm::insert` builder is used:
 
 ```rust
 #[derive(Patch)]
@@ -214,14 +213,14 @@ struct NewPost {
 
 async fn insert_example(db: &Database) -> Result<(), rorm::Error> {
     // insert a single user
-    insert!(db, NewUser).single(&NewUser {
+    rorm::insert(db, NewUser).single(&NewUser {
         username: "alice".to_string(),
         password: "Secure-123".to_string(),
     }).await?;
 
     // insert a collection of user posts
     let posts: Vec<> = vec![...];
-    insert!(db, NewPost).bulk(&posts).await?;
+    rorm::insert(db, NewPost).bulk(&posts).await?;
     
     Ok(())
 }
@@ -238,7 +237,7 @@ But what if you need the values of fields which are set by the database?
 
 ### Returning
 
-The `insert!` macro returns the whole model it just inserted:
+The `rorm::insert` builder returns the whole model it just inserted:
 
 ```rust
 #[derive(Patch)]
@@ -249,38 +248,38 @@ struct NewUser {
 }
 
 // Note that the type `User` is returned instead of just a `NewUser`
-let new_user: User = insert!(db, NewUser).single(&NewUser {..}).await?;
+let new_user: User = rorm::insert(db, NewUser).single(&NewUser {..}).await?;
 ```
 
-To customize the behaviour, a family of `.return_...()` methods are provided:
+To customize the behavior, a family of `.return_...()` methods are provided:
 ```rust
 pub async fn show_various_returns(db: &Database, user: &NewUser) -> Result<(), Error> {
     // Return model instance by default
-    let _: User = insert!(db, NewUser)
+    let _: User = rorm::insert(db, NewUser)
         .single(user)
         .await?;
 
     // Return a patch's instance instead of whole model
     // (including the one used to insert and the model itself)
-    let _: AnotherUserPatch = insert!(db, NewUser)
+    let _: AnotherUserPatch = rorm::insert(db, NewUser)
         .return_patch::<UserPatch>()
         .single(user)
         .await?;
 
     // Return a tuple of fields
-    let _: (i64, String) = insert!(db, NewUser)
+    let _: (i64, String) = rorm::insert(db, NewUser)
         .return_tuple((User.id, User.name))
         .single(user)
         .await?;
 
     // Return the model's primary key
-    let _: i64 = insert!(db, NewUser)
+    let _: i64 = rorm::insert(db, NewUser)
         .return_primary_key()
         .single(user)
         .await?;
 
     // Return nothing
-    let _: () = insert!(db, NewUser)
+    let _: () = rorm::insert(db, NewUser)
         .return_nothing()
         .single(user)
         .await?;
@@ -291,11 +290,11 @@ pub async fn show_various_returns(db: &Database, user: &NewUser) -> Result<(), E
 
 ## Update
 
-In order to change models' fields the `update!` macro is used:
+To change models' fields the `rorm::update` builder is used:
 
 ```rust
 pub async fn set_good_password(db: &Database) -> Result<(), rorm::Error> {
-    update!(db, User)
+    rorm::update(db, User)
         .set(User.password, "I am way more secure™".to_string())
         .condition(User.password.equals("password"))
         .await?;
@@ -307,7 +306,7 @@ pub async fn set_good_password(db: &Database) -> Result<(), rorm::Error> {
 
 Before executing the query, `set` has to be called at least once
 to set a value for a column (the first call changes the builder's type).
-Otherwise the query wouldn't do anything.
+Otherwise, the query wouldn't do anything.
 
 This can be limiting when your calls are made conditionally.
 
@@ -325,7 +324,7 @@ async fn update_user(
     optional_new_username: Option<String>,
     optional_new_password: Option<String>
 ) -> Result<(), rorm::Error> {
-    let mut updater = update!(db, User).begin_dyn_set();
+    let mut updater = rorm::update(db, User).begin_dyn_set();
 
     if let Some(new_username) = optional_new_username {
         updater = updater.set(User.username, new_username);
@@ -351,7 +350,7 @@ async fn update_user(
     optional_new_username: Option<String>,
     optional_new_password: Option<String>
 ) -> Result<(), rorm::Error> {
-    let updater = update!(db, User)
+    let updater = rorm::update(db, User)
         .begin_dyn_set()
         .set_if(User.username, optional_new_username)
         .set_if(User.password, optional_new_password);
@@ -367,30 +366,30 @@ async fn update_user(
 
 ## Delete
 
-In order to delete rows from a table, the `delete!` macro is used:
+To delete rows from a table, the `rorm::delete` builder is used:
 
 ```rust
 pub async fn delete_single_user(db: &Database, user: &UserPatch) -> Result<(), rorm::Error> {
-    delete!(db, User)
+    rorm::delete(db, User)
         .single(user)
         .await?;
     Ok(())
 }
 pub async fn delete_many_users(db: &Database, users: &[UserPatch]) -> Result<(), rorm::Error> {
-    delete!(db, User)
+    rorm::delete(db, User)
         .bulk(users)
         .await?;
     Ok(())
 }
 pub async fn delete_underage(db: &Database) -> Result<(), rorm::Error> {
-    let num_deleted: u64 = delete!(db, User)
+    let num_deleted: u64 = rorm::delete(db, User)
         .condition(User.age.less_equals(18))
         .await?;
     Ok(())
 }
 ```
 
-A `delete!` is quite simple. It expects only one of four methods which specify what to delete:
+A `rorm::delete` is quite simple. It expects only one of four methods which specify what to delete:
 
 ### `.single(...)`
 To delete a single row, use the `single` method and pass it the model to delete.

@@ -65,7 +65,7 @@ pub async fn create_user(
     let mut tx = db.start_transaction().await?;
 
     // Check if the username is already taken
-    let is_taken = query!(&mut tx, (User.id,))
+    let is_taken = rorm::query(&mut tx, User.id)
         .condition(User.username.equals(&username))
         .optional()
         .await?
@@ -76,7 +76,7 @@ pub async fn create_user(
     }
     
     // Insert the new user
-    let id = insert!(&mut tx, UserInsert)
+    let id = rorm::insert(&mut tx, UserInsert)
         .return_primary_key()
         .single(&UserInsert { username })
         .await
@@ -114,7 +114,7 @@ async fn create_user(username: String, exe: impl Executor<'_>) -> Result<(), ror
 
     // It can be used very similar to a normal transaction
     // through `get_transaction`
-    insert!(guard.get_transaction(), UserInsert)
+    rorm::insert(guard.get_transaction(), UserInsert)
         .return_primary_key()
         .single(&UserInsert { username })
         .await?;
