@@ -1,10 +1,11 @@
 # RORM Documentation
 
-rorm is a multi-language orm (object-relation-manager).
+rorm is an ORM (object-relation-mapper) for the Rust programming language.
 
 It is heavily inspired by the excellent orm of the django webframework.
 
-There are currently two versions:
+To get started, head over to [Getting Started](rorm/getting_started.md).
 
-- [dorm](dorm/): for the D programming language
-- [rorm](rorm/getting_started): for the rust programming language
+For a complete, runnable application using rorm, have a look at the
+[example forum server](https://github.com/rorm-orm/rorm/tree/dev/example-forum-server)
+in the rorm repository.

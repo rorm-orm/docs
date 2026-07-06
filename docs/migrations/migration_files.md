@@ -247,7 +247,8 @@ SQLite = ""
 # single SQL statement on PostgreSQL databases
 Postgres = ""
 
-# single SQL statement on MySQL databases
+# Legacy key: MySQL support has been removed in v0.10.0.
+# The key is still required by the file format but its value is ignored.
 MySQL = ""
 ```
 

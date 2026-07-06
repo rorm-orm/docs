@@ -102,10 +102,48 @@ User.username.equals("bob")
 Field to compare
 ```
 
-The concrete comparisons available depend on the field's type.
+The concrete comparisons available depend on the field's type:
 
-Non-exhaustive list of commonly used ones:
-`equals`, `not_equals`, `less_than`, `less_equals`, `greater_than`, `greater_equals`
+**Comparisons** (most types):
+
+- `equals`, `not_equals`
+- `less_than`, `less_equals`, `greater_than`, `greater_equals`
+
+**Sets** — check the field against a collection of values (SQL `IN`):
+
+```rust
+// `in` is a rust keyword, so it has to be a raw identifier: `r#in`
+User.id.r#in([1, 2, 3])
+User.id.not_in(some_ids)
+```
+
+**Options** — for nullable fields (i.e. fields with an `Option<...>` type):
+
+```rust
+Post.user.is_none()
+Post.user.is_some()
+```
+
+**Strings**:
+
+- `like`, `not_like`: SQL `LIKE` with its wildcards `%` (any substring) and `_` (any character)
+- `contains`, `starts_with`, `ends_with`: convenience wrappers around `LIKE`
+  which escape any wildcards contained in their argument
+- `regexp`, `not_regexp`: match against a regular expression
+
+```rust
+User.username.like("bob%")          // wildcards are interpreted
+User.username.starts_with("bob")    // wildcards are escaped
+```
+
+**Postgres only** — with the `postgres-only` feature there are also:
+
+- `equals_ignore_case`
+- `like_ignore_case`, `not_like_ignore_case` (SQL `ILIKE`)
+- `contains_ignore_case`, `starts_with_ignore_case`, `ends_with_ignore_case`
+- `net_contained_in` and `net_contained_in_or_equals` on `IpNetwork` fields,
+  checking whether the field's network is contained in a given network
+  (postgres' `<<` and `<<=` operators)
 
 Conditions can then be combined using the `or!` and `and!` macros:
 ```rust
@@ -167,6 +205,36 @@ let posts: Vec<(String, UserWithoutPassword)> =
     rorm::query(db, (Post.message, Post.user.query_as(UserWithoutPassword))).all().await?;
 ```
 
+#### Aggregation
+
+Instead of selecting a field's values, you can select an aggregation over them
+by calling one of the aggregation methods on the field:
+
+```rust
+// Number of posts written by a specific user
+let count: i64 = rorm::query(db, Post.id.count())
+    .condition(Post.user.username.equals("alice"))
+    .one()
+    .await?;
+```
+
+The following aggregation functions are available:
+
+- `count()`: number of rows (an `i64`)
+- `sum()`: sum of the field's values
+- `avg()`: average of the field's values (an `Option<f64>`)
+- `max()` / `min()`: largest / smallest value
+
+Which ones a field offers depends on its type —
+`sum` and `avg` require numeric fields
+while `max` and `min` work on anything with an ordering (e.g. dates too).
+
+!!! note
+    Except for `count`, the aggregations return an `Option`
+    which will be `None` if no row matched the condition.
+    Also mind that `sum` might use a bigger type than the field itself
+    (e.g. `Option<i64>` for an `i16` field) to reduce the risk of overflows.
+
 #### Limit & offset
 
 Just as you would expect them, the `.limit(u64)` and `.offset(u64)` functions can be used to add limits and offsets
@@ -190,7 +258,71 @@ rorm::query(db, Post).range(30..40).all().await?;
 
 #### Ordering
 
-TODO: `order_...`
+To sort the returned rows, use `.order_asc(...)` and `.order_desc(...)` with a field to order by:
+
+```rust
+// All users, ordered by their username
+rorm::query(db, User).order_asc(User.username).all().await?;
+```
+
+Both methods can be called multiple times.
+The first call takes the highest priority, every further call breaks the ties of the previous one:
+
+```rust
+// Sort posts by their creator, newest first per creator
+rorm::query(db, Post)
+    .order_asc(Post.user.username)
+    .order_desc(Post.id)
+    .all()
+    .await?;
+```
+
+There is also the more generic `.order_by(field, ordering)` which takes the direction
+as a value of `rorm::db::sql::ordering::Ordering`, in case it has to be decided at runtime.
+
+#### Distinct
+
+The `.distinct()` method eliminates duplicate rows from the result:
+
+```rust
+// Every username only once, even if several posts link to the same user
+let usernames: Vec<String> = rorm::query(db, Post.user.username)
+    .distinct()
+    .all()
+    .await?;
+```
+
+!!! note
+    This directly corresponds to adding a `DISTINCT` to the `SELECT` statement.
+
+#### Row locking (postgres only)
+
+When querying inside a transaction, `.lock(...)` can be used to lock the returned rows,
+for example to prevent concurrent transactions from modifying them until yours is finished.
+
+```rust
+use rorm::db::sql::select::{LockAcquire, LockStrength};
+
+let mut tx = db.start_transaction().await?;
+
+// SELECT ... FOR UPDATE
+let user: User = rorm::query(&mut tx, User)
+    .condition(User.id.equals(user_id))
+    .lock(LockStrength::Update, LockAcquire::Wait)
+    .one()
+    .await?;
+```
+
+`LockStrength` selects the lock mode (`Update`, `NoKeyUpdate`, `Share`, `KeyShare` — corresponding to
+`FOR UPDATE`, `FOR NO KEY UPDATE`, `FOR SHARE` and `FOR KEY SHARE`).
+
+`LockAcquire` controls what happens when a row is already locked:
+`Wait` blocks until the lock is released, `NoWait` errors immediately
+and `SkipLocked` silently omits locked rows from the result.
+
+!!! warning
+    `.lock()` is only available with the `postgres-only` cargo feature,
+    since the other databases don't support this family of locks.
 
 ## Insert
 

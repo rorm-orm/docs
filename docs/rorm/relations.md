@@ -42,6 +42,41 @@ struct User {
     }
     ```
 
+### Cascading foreign keys
+
+By default the database will refuse to delete or update a row
+while another row's foreign key is still pointing to it (`Restrict`).
+This behavior can be changed with the `on_delete` and `on_update`
+[annotations](./model_declaration.md#on_delete-on_update).
+
+Since `Cascade` for both is such a common combination —
+"when the parent is deleted, delete its children as well" —
+there is a dedicated type for it: `CascadingForeignModel<T>`.
+It behaves exactly like a `ForeignModel<T>` with
+`#[rorm(on_delete = "Cascade", on_update = "Cascade")]`,
+but expresses the cascading behavior directly in the type.
+
+```rust
+use rorm::fields::types::CascadingForeignModel;
+use rorm::prelude::*;
+
+#[derive(Model)]
+struct Post {
+    #[rorm(id)]
+    id: i64,
+
+    /// Deleting the thread deletes its posts as well
+    thread: CascadingForeignModel<Thread>,
+
+    /// Deleting the user keeps the post but clears the field
+    #[rorm(on_delete = "SetNull")]
+    user: Option<ForeignModel<User>>,
+}
+```
+
+Like `ForeignModel` has `ForeignModelByField`, there is a
+`CascadingForeignModelByField<T>` to reference non-primary keys (see below).
+
 ### Foreign keys on non-primary keys
 
 With `ForeignModel` it is not possible to reference a non-primary key.
@@ -105,3 +140,37 @@ struct User {
     feature provided by rorm to simplify querying, there's no need to
     make migrations after the field was added, as it handled internally by
     rorm.
+
+### Using a backref
+
+A `BackRef` field is not filled automatically when its model is queried —
+it acts as a cache which starts out empty.
+It is filled explicitly through the [field access syntax](./field_access_syntax.md):
+
+```rust
+let mut user: User = rorm::query(db, User)
+    .condition(User.id.equals(user_id))
+    .one()
+    .await?;
+
+// Query the user's posts into the backref's cache ...
+User.posts.populate(db, &mut user).await?;
+
+// ... and access them through `get`
+let posts: &Vec<Post> = user.posts.get().unwrap();
+```
+
+`populate` always queries, overwriting a previously filled cache.
+If you just want the referenced rows and don't care about the cache,
+there are two convenience methods combining both steps:
+
+```rust
+// Populates only if the cache is still empty, then borrows it
+let posts: &mut [Post] = User.posts.get_or_query(db, &mut user).await?;
+
+// Like `get_or_query` but takes ownership, leaving the cache empty again
+let posts: Vec<Post> = User.posts.take_or_query(db, &mut user).await?;
+```
+
+For filling the backrefs of several instances at once,
+there is `populate_bulk` which takes a mutable slice instead of a single instance.
