@@ -145,6 +145,33 @@ Fields without a `priority` are treated as if they had `priority = 0`.
 
 ---
 
+A primary key may be part of a composite index, but only a *named* one:
+
+```rust
+use rorm::prelude::*;
+
+#[derive(Model)]
+struct Entry {
+    #[rorm(primary_key, index(name = "owner_id", priority = 2))]
+    id: i64,
+
+    #[rorm(index(name = "owner_id", priority = 1), max_length = 255)]
+    owner: String,
+}
+```
+
+This is the index for "filter by `owner`, sort by `id`": because the columns
+appear in that order, one index answers both halves of the query, and the
+database does not have to sort the rows it found. The same shape applies to a
+foreign key followed by the primary key, which is what listing the rows
+belonging to one parent usually looks like.
+
+An *unnamed* `#[rorm(index)]` on a primary key is rejected by the
+[linter](../migrations/linter.md): a primary key is already indexed, so a
+single-column index on it would only be a second copy of that index.
+
+---
+
 Unlike columns, indexes don't live in their table's namespace.
 Their names have to be unique across the whole database,
 which is why the migrator prefixes them with their table's name:
@@ -155,6 +182,10 @@ which is why the migrator prefixes them with their table's name:
 | `#[rorm(index(name = ".."))]` | `<table>_<name>_idx`  |
 
 `make-migrations` reports an error if two indexes end up with the same name.
+
+Since the table name is added for you, a `name` that repeats it reads twice in
+the result — `#[rorm(index(name = "user"))]` on `user` becomes `user_user_idx`.
+Name the index after the columns it spans instead.
 
 !!!note
     Adding or removing an `index` does not touch the column itself,

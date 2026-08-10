@@ -27,6 +27,12 @@ if any check fails, no migration files are written.
   and requires the `PrimaryKey` annotation on the same field.
 - Annotations must not conflict with each other
   (e.g. `AutoCreateTime` combined with `AutoIncrement`).
+- An `Index` annotation *without* a name may not be combined with `PrimaryKey`:
+  a primary key is already indexed, so this would only add a second copy of that
+  index. A *named* index on a primary key is allowed, because it may span
+  several columns — see [`index`](../rorm/model_declaration.md#index).
+- `AutoUpdateTime` together with `NotNull` requires either `DefaultValue` or
+  `AutoCreateTime`, since the column has no value before its first update.
 
 !!! note
     Most of these rules are already enforced at compile time by the
