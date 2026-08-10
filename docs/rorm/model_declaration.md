@@ -107,13 +107,6 @@ struct User {
 
 ### `index`
 
-!!!warning
-    While the `index` annotation is parsed and tracked,
-    the migrator does **not** generate any `CREATE INDEX` statements from it yet.
-    To actually create an index, use a
-    [raw SQL migration](../migrations/migration_files.md#raw-sql-operation)
-    for now.
-
 To declare a standard index:
 ```rust
 use rorm::prelude::*;
@@ -147,6 +140,25 @@ struct User {
     last_name: String,
 }
 ```
+
+Fields without a `priority` are treated as if they had `priority = 0`.
+
+---
+
+Unlike columns, indexes don't live in their table's namespace.
+Their names have to be unique across the whole database,
+which is why the migrator prefixes them with their table's name:
+
+| Declaration                | Index in the database |
+|----------------------------|-----------------------|
+| `#[rorm(index)]`           | `<table>_<column>_idx` |
+| `#[rorm(index(name = ".."))]` | `<table>_<name>_idx`  |
+
+`make-migrations` reports an error if two indexes end up with the same name.
+
+!!!note
+    Adding or removing an `index` does not touch the column itself,
+    so the migration keeps the data it holds.
 
 ### `max_length`
 Specify the maximum length a String can have. This is required for every string.

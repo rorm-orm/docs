@@ -223,6 +223,53 @@ Name = "foo"
 Name = "counter"
 ```
 
+#### Create Index Operation
+
+This operation creates an index on an existing table.
+
+Indexes are declared through the [`index` annotation](../rorm/model_declaration.md#index)
+on the fields they span, but they are not part of a column's definition.
+`make-migrations` gathers them into their own operations,
+which are ordered so that an index is deleted before its columns are touched
+and created after they exist.
+
+```toml
+[[Migration.Operations]]
+Type = "CreateIndex"
+
+# Name of the table to create the index on
+Model = "foo"
+
+[Migration.Operations.Index]
+# The name the index was declared under.
+# Omit it for an index which was declared without a name,
+# such an index always spans exactly one column.
+Name = "counter_name"
+
+# The columns the index spans, in the order they should be indexed in
+Columns = ["counter", "name"]
+```
+
+The identifier the index is created under in the database is derived from
+`Model` and `Name`, see [`index`](../rorm/model_declaration.md#index).
+
+#### Delete Index Operation
+
+This operation deletes an index. Its fields are the same as
+[Create Index](#create-index-operation)'s, describing the index to delete.
+
+```toml
+[[Migration.Operations]]
+Type = "DeleteIndex"
+
+# Name of the table the index was created on
+Model = "foo"
+
+[Migration.Operations.Index]
+Name = "counter_name"
+Columns = ["counter", "name"]
+```
+
 #### Raw SQL Operation
 
 This operation performs raw SQL statements on the database.

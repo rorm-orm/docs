@@ -155,7 +155,8 @@ Default types for varbinary should be encoded using hex strings.
 
 If `index` is used without a value, a new index is created on the column.
 
-If a composite index is desired, the `Name` and `Priority` fields are required:
+If a composite index is desired, the `Name` field is required.
+The `Priority` field is optional and defaults to `0`:
 
 ```json
 {
